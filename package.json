@@ -1,0 +1,21 @@
+{
+  "name": "pharos-chain-mcp-reader",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Read Pharos contract state through the official Chain MCP server.",
+  "bin": {
+    "pharos-chain-mcp-reader": "src/cli.mjs"
+  },
+  "scripts": {
+    "start": "node src/cli.mjs",
+    "check": "node --check src/cli.mjs && node --check src/reader.mjs && node --check src/abi.mjs && node --check src/format.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1"
+  }
+}
