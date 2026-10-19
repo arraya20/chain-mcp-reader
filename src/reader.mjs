@@ -1,14 +1,8 @@
 import {
-  ERC20_SELECTORS,
-  MCP_URL,
-  PHAROS_CHAIN_ID,
-  decodeAbiString,
-  decodeUint,
-  encodeAddressCall,
-  requireAddress,
-  requireHex,
+  ERC20_SELECTORS, MCP_URL, PHAROS_CHAIN_ID, decodeAbiString, decodeUint,
+  encodeAddressCall, requireAddress, requireHex,
 } from "./abi.mjs";
-import { mcpInitialize, mcpRequest } from "./mcp.mjs";
+import { mcpClose, mcpInitialize, mcpRequest } from "./mcp.mjs";
 import { makeStateReport } from "./format.mjs";
 
 const REQUIRED_TOOLS = ["get_chain_info", "get_block_number", "get_code", "eth_call"];
@@ -27,62 +21,53 @@ function toolResult(message, toolName) {
   }
 }
 
-export async function readContractState({
-  contractAddress,
-  walletAddress,
-  mcpUrl = MCP_URL,
-  timeoutMs = 30_000,
-} = {}) {
+export async function readContractState({ contractAddress, walletAddress, mcpUrl = MCP_URL, timeoutMs = 30_000 } = {}) {
   const address = requireAddress(contractAddress, "contract address");
   const wallet = walletAddress ? requireAddress(walletAddress, "wallet address") : undefined;
-  const initialized = await mcpInitialize(mcpUrl, timeoutMs);
-  const sessionId = initialized.sessionId;
-  const list = await mcpRequest({ url: mcpUrl, sessionId, id: 3, method: "tools/list", timeoutMs });
-  const tools = list.message.result?.tools ?? [];
-  const available = new Set(tools.map((tool) => tool.name));
-  const missing = REQUIRED_TOOLS.filter((tool) => !available.has(tool));
-  if (missing.length) throw new Error(`Pharos MCP is missing required tools: ${missing.join(", ")}`);
+  let sessionId;
+  try {
+    const initialized = await mcpInitialize(mcpUrl, timeoutMs);
+    sessionId = initialized.sessionId;
+    const list = await mcpRequest({ url: mcpUrl, sessionId, id: 3, method: "tools/list", timeoutMs });
+    const available = new Set((list.message.result?.tools ?? []).map((tool) => tool.name));
+    const missing = REQUIRED_TOOLS.filter((tool) => !available.has(tool));
+    if (missing.length) throw new Error(`Pharos MCP is missing required tools: ${missing.join(", ")}`);
 
-  let id = 10;
-  async function callTool(name, args = {}) {
-    const response = await mcpRequest({ url: mcpUrl, sessionId, id: id++, method: "tools/call", params: { name, arguments: args }, timeoutMs });
-    return toolResult(response.message, name);
+    let id = 10;
+    async function callTool(name, args = {}) {
+      const response = await mcpRequest({ url: mcpUrl, sessionId, id: id++, method: "tools/call", params: { name, arguments: args }, timeoutMs });
+      return toolResult(response.message, name);
+    }
+
+    const [chain, latest] = await Promise.all([callTool("get_chain_info"), callTool("get_block_number")]);
+    if (Number(chain.chainId) !== PHAROS_CHAIN_ID) throw new Error(`Expected Pharos chain ID ${PHAROS_CHAIN_ID}, received ${chain.chainId}`);
+    const blockNumber = String(latest.blockNumber);
+    if (!/^\d+$/.test(blockNumber)) throw new Error("get_block_number returned an invalid block number");
+
+    const code = await callTool("get_code", { address, block: blockNumber });
+    const bytecode = requireHex(code.code, "get_code");
+    if (bytecode === "0x" || /^0x0*$/.test(bytecode)) throw new Error(`No contract bytecode found at ${address} at block ${blockNumber}`);
+
+    const calls = { ...ERC20_SELECTORS };
+    if (!wallet) delete calls.balanceOf;
+    const entries = await Promise.all(Object.entries(calls).map(async ([field, selector]) => {
+      const data = field === "balanceOf" ? encodeAddressCall(selector, wallet) : selector;
+      const response = await callTool("eth_call", { transaction: { to: address, data }, block: blockNumber });
+      return [field, requireHex(response.result, `eth_call ${field}()` )];
+    }));
+    const raw = Object.fromEntries(entries);
+    const decimalsBigInt = decodeUint(raw.decimals, "decimals()");
+    if (decimalsBigInt > 255n) throw new Error(`decimals() returned an invalid value: ${decimalsBigInt}`);
+    const decimals = Number(decimalsBigInt);
+    const values = {
+      name: decodeAbiString(raw.name, "name()"),
+      symbol: decodeAbiString(raw.symbol, "symbol()"),
+      decimals,
+      totalSupply: decodeUint(raw.totalSupply, "totalSupply()"),
+      ...(wallet ? { balanceOf: decodeUint(raw.balanceOf, "balanceOf(address)") } : {}),
+    };
+    return makeStateReport({ chain, blockNumber, contractAddress: address, walletAddress: wallet, raw, values });
+  } finally {
+    await mcpClose(mcpUrl, sessionId);
   }
-
-  const [chain, latest] = await Promise.all([callTool("get_chain_info"), callTool("get_block_number")]);
-  if (Number(chain.chainId) !== PHAROS_CHAIN_ID) {
-    throw new Error(`Expected Pharos chain ID ${PHAROS_CHAIN_ID}, received ${chain.chainId}`);
-  }
-  const blockNumber = String(latest.blockNumber);
-  if (!/^\d+$/.test(blockNumber)) throw new Error("get_block_number returned an invalid block number");
-
-  const code = await callTool("get_code", { address, block: blockNumber });
-  const bytecode = requireHex(code.code, "get_code");
-  if (bytecode === "0x" || /^0x0*$/.test(bytecode)) {
-    throw new Error(`No contract bytecode found at ${address} at block ${blockNumber}`);
-  }
-
-  const calls = { ...ERC20_SELECTORS };
-  if (!wallet) delete calls.balanceOf;
-  const entries = await Promise.all(Object.entries(calls).map(async ([field, data]) => {
-    const callData = field === "balanceOf" ? encodeAddressCall(data, wallet) : data;
-    const response = await callTool("eth_call", {
-      transaction: { to: address, data: callData },
-      block: blockNumber,
-    });
-    return [field, requireHex(response.result, `eth_call ${field}()`), callData];
-  }));
-  const raw = Object.fromEntries(entries.map(([field, value]) => [field, value]));
-
-  const decimalsBigInt = decodeUint(raw.decimals, "decimals()");
-  if (decimalsBigInt > 255n) throw new Error(`decimals() returned an invalid value: ${decimalsBigInt}`);
-  const decimals = Number(decimalsBigInt);
-  const values = {
-    name: decodeAbiString(raw.name, "name()"),
-    symbol: decodeAbiString(raw.symbol, "symbol()"),
-    decimals,
-    totalSupply: decodeUint(raw.totalSupply, "totalSupply()"),
-    ...(wallet ? { balanceOf: decodeUint(raw.balanceOf, "balanceOf(address)") } : {}),
-  };
-  return makeStateReport({ chain, blockNumber, contractAddress: address, walletAddress: wallet, raw, values });
 }

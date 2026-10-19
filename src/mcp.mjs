@@ -2,14 +2,10 @@ export async function mcpRequest({ url, sessionId, id, method, params = {}, time
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const headers = {
-      "content-type": "application/json",
-      accept: "application/json, text/event-stream",
-    };
+    const headers = { "content-type": "application/json", accept: "application/json, text/event-stream" };
     if (sessionId) headers["mcp-session-id"] = sessionId;
     const response = await fetch(url, {
-      method: "POST",
-      headers,
+      method: "POST", headers,
       body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
       signal: controller.signal,
     });
@@ -27,9 +23,7 @@ export async function mcpRequest({ url, sessionId, id, method, params = {}, time
 
 export async function mcpInitialize(url, timeoutMs) {
   const result = await mcpRequest({
-    url,
-    id: 1,
-    method: "initialize",
+    url, id: 1, method: "initialize",
     params: {
       protocolVersion: "2025-06-18",
       capabilities: {},
@@ -37,22 +31,39 @@ export async function mcpInitialize(url, timeoutMs) {
     },
     timeoutMs,
   });
+  await notifyInitialized(url, result.sessionId, timeoutMs);
+  return result;
+}
+
+async function notifyInitialized(url, sessionId, timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const headers = {
-      "content-type": "application/json",
-      accept: "application/json, text/event-stream",
-      "mcp-session-id": result.sessionId,
-    };
-    await fetch(url, {
+    const response = await fetch(url, {
       method: "POST",
-      headers,
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        "mcp-session-id": sessionId,
+      },
       body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized", params: {} }),
       signal: controller.signal,
     });
+    if (!response.ok) throw new Error(`MCP initialization notification failed: HTTP ${response.status}`);
   } finally {
     clearTimeout(timer);
   }
-  return result;
+}
+
+export async function mcpClose(url, sessionId, timeoutMs = 5_000) {
+  if (!sessionId) return;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    await fetch(url, { method: "DELETE", headers: { "mcp-session-id": sessionId }, signal: controller.signal });
+  } catch {
+    // Session expiry is handled server-side; cleanup must not hide read results.
+  } finally {
+    clearTimeout(timer);
+  }
 }

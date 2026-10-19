@@ -26,14 +26,20 @@ export function requireHex(value, label) {
 function hexBytes(value, label) {
   const hex = requireHex(value, label).slice(2);
   if (hex.length % 2 !== 0) throw new Error(`${label} returned odd-length hex data`);
-  return Buffer.from(hex, "hex");
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i += 1) bytes[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  return bytes;
 }
 
 function wordToBigInt(bytes, offset, label) {
-  if (offset < 0 || offset + 32 > bytes.length) {
-    throw new Error(`${label} returned truncated ABI data`);
-  }
-  return BigInt(`0x${bytes.subarray(offset, offset + 32).toString("hex")}`);
+  if (offset < 0 || offset + 32 > bytes.length) throw new Error(`${label} returned truncated ABI data`);
+  let hex = "";
+  for (let i = offset; i < offset + 32; i += 1) hex += bytes[i].toString(16).padStart(2, "0");
+  return BigInt(`0x${hex}`);
+}
+
+function decodeUtf8(bytes) {
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
 }
 
 export function decodeUint(value, label) {
@@ -45,26 +51,21 @@ export function decodeUint(value, label) {
 export function decodeAbiString(value, label) {
   const bytes = hexBytes(value, label);
   if (bytes.length < 32) throw new Error(`${label} returned less than one ABI word`);
-
   const offset = wordToBigInt(bytes, 0, label);
   if (offset <= BigInt(Number.MAX_SAFE_INTEGER)) {
     const start = Number(offset);
     if (start % 32 === 0 && start + 32 <= bytes.length) {
       const length = wordToBigInt(bytes, start, label);
-      if (length > BigInt(Number.MAX_SAFE_INTEGER)) {
-        throw new Error(`${label} returned an unsupported string length`);
-      }
+      if (length > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error(`${label} returned an unsupported string length`);
       const end = start + 32 + Number(length);
       if (end > bytes.length) throw new Error(`${label} returned truncated string data`);
-      return bytes.subarray(start + 32, end).toString("utf8");
+      return decodeUtf8(bytes.subarray(start + 32, end));
     }
   }
-
   // Compatibility with older ERC-20 contracts returning bytes32.
   const firstWord = bytes.subarray(0, 32);
   const zero = firstWord.indexOf(0);
-  const end = zero === -1 ? firstWord.length : zero;
-  const decoded = firstWord.subarray(0, end).toString("utf8");
+  const decoded = decodeUtf8(firstWord.subarray(0, zero === -1 ? 32 : zero));
   if (!decoded) throw new Error(`${label} returned an empty or unsupported string`);
   return decoded;
 }

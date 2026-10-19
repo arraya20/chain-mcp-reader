@@ -9,13 +9,10 @@
   },
   "scripts": {
     "start": "node src/cli.mjs",
-    "check": "node --check src/cli.mjs && node --check src/reader.mjs && node --check src/abi.mjs && node --check src/format.mjs",
+    "check": "node --check src/cli.mjs && node --check src/reader.mjs && node --check src/abi.mjs && node --check src/format.mjs && node --check src/mcp.mjs && node --check functions/api/read-contract.js",
     "test": "node --test test/*.test.mjs"
   },
   "engines": {
     "node": ">=20"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "1.32.1"
   }
 }
