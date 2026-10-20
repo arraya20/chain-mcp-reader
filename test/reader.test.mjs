@@ -8,12 +8,26 @@ import {
 } from "../src/abi.mjs";
 import { formatUnits, makeStateReport } from "../src/format.mjs";
 
+const BYTES32_SYMBOL = `0x${Buffer.from("OLD").toString("hex").padEnd(64, "0")}`;
 const ABI_STRING = "0x" + "20".padStart(64, "0") + "04".padStart(64, "0") + Buffer.from("USDC").toString("hex").padEnd(64, "0");
 
 test("decodes dynamic ABI strings", () => {
   assert.equal(decodeAbiString(ABI_STRING, "name()"), "USDC");
 });
 
+test("decodes bytes32 token metadata from non-standard ERC-20", () => {
+  assert.equal(decodeAbiString(BYTES32_SYMBOL, "symbol()"), "OLD");
+});
+
+test("rejects malformed ABI words", () => {
+  assert.throws(() => decodeUint("0x12", "decimals()"), /less than one ABI word/);
+  assert.throws(() => decodeAbiString("0x" + "20".padStart(64, "0"), "name()"), /empty or unsupported|truncated/);
+});
+
+test("accepts zero-decimal and high-decimal formatting", () => {
+  assert.equal(formatUnits(42n, 0), "42");
+  assert.equal(formatUnits(42n, 6), "0.000042");
+});
 test("decodes uint256 without Number precision loss", () => {
   const raw = `0x${"ce8f8f6cf13443655f9c".padStart(64, "0")}`;
   assert.equal(decodeUint(raw, "totalSupply()"), 975455714774139059658652n);
@@ -33,6 +47,7 @@ test("formats token units", () => {
 
 test("rejects invalid addresses", () => {
   assert.throws(() => requireAddress("not-an-address"), /Invalid address/);
+  assert.throws(() => requireAddress("0x1234"), /Invalid address/);
 });
 
 test("builds stable JSON report with pinned block", () => {

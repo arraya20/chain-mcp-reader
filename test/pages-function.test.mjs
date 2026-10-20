@@ -6,6 +6,8 @@ function context({ method = "POST", headers = {}, body = "{}", url = "https://de
   return { request: new Request(url, { method, headers, body: method === "GET" || method === "HEAD" ? undefined : body }) };
 }
 
+const validContract = "0x6b0a44c64190279f7034b77c13a566e914fe5ec4";
+
 test("rejects non-POST methods", async () => {
   const response = await onRequest(context({ method: "GET" }));
   assert.equal(response.status, 405);
@@ -32,6 +34,23 @@ test("rejects oversized body even without content-length", async () => {
   assert.equal(response.status, 413);
 });
 
+test("rejects unexpected fields", async () => {
+  const response = await onRequest(context({
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ contractAddress: validContract, mcpUrl: "https://attacker.example" }),
+  }));
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /Only contractAddress/);
+});
+
+test("rejects wrong wallet type", async () => {
+  const response = await onRequest(context({
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ contractAddress: validContract, walletAddress: 123 }),
+  }));
+  assert.equal(response.status, 400);
+});
+
 test("validates address before making external MCP call", async () => {
   const response = await onRequest(context({
     headers: { "content-type": "application/json" },
@@ -39,4 +58,17 @@ test("validates address before making external MCP call", async () => {
   }));
   assert.equal(response.status, 400);
   assert.match((await response.json()).error, /Invalid contract address/);
+});
+
+test("rate limits repeated requests in one isolate", async () => {
+  globalThis.__readContractRate = new Map();
+  const request = () => onRequest(context({
+    headers: { "content-type": "application/json", "CF-Connecting-IP": "test-rate-limit" },
+    body: JSON.stringify({ contractAddress: "bad" }),
+  }));
+  for (let i = 0; i < 10; i += 1) assert.equal((await request()).status, 400);
+  const response = await request();
+  assert.equal(response.status, 429);
+  assert.equal(response.headers.get("Retry-After"), "60");
+  delete globalThis.__readContractRate;
 });

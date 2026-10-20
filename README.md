@@ -76,6 +76,67 @@ npm start -- \
   --json
 ```
 
+## Web demo and API
+
+The repository includes a browser demo in `public/` and a Cloudflare Pages
+Function at `functions/api/read-contract.js`.
+
+The web form sends this same-origin request:
+
+```http
+POST /api/read-contract
+Content-Type: application/json
+```
+
+Body:
+
+```json
+{
+  "contractAddress": "0x6b0a44c64190279f7034b77c13a566e914fe5ec4",
+  "walletAddress": "0x2e1c3e80d13b03aac05aeefacc254e26d6fafb51"
+}
+```
+
+The API accepts only `contractAddress` and optional `walletAddress`. It fixes
+upstream access to the official MCP endpoint, rejects cross-origin requests,
+limits request size, validates addresses before upstream calls, returns
+`no-store` responses, and applies a best-effort per-isolate request limit.
+Configure a Cloudflare WAF rate-limit rule before exposing the anonymous API
+widely; in-memory limits do not coordinate across Workers isolates.
+
+The demo displays the contract address, wallet address, pinned block, decoded
+state, raw ABI values, chain ID, and read-only MCP provenance. It never asks
+for a private key, seed phrase, wallet connection, or transaction signature.
+
+### Local web preview
+
+Install Wrangler if needed, then run:
+
+```bash
+npx wrangler pages dev public
+```
+
+Open the local URL printed by Wrangler. The API route is available at
+`/api/read-contract`.
+
+### Cloudflare Pages deployment
+
+Connect this repository in **Workers & Pages → Create → Pages → Connect to
+Git**. Use:
+
+```text
+Production branch: main
+Framework preset: None
+Build command: npm ci && npm run check && npm test
+Build output directory: public
+Root directory: /
+```
+
+Cloudflare Pages detects the root `functions/` directory and deploys the API
+route with the static site. No secrets or environment variables are required.
+After deployment, test the generated `*.pages.dev` URL before attaching a
+custom domain.
+
 ## Output guarantees
 
 - Verifies chain ID `1672`.
