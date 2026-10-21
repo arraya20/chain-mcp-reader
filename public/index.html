@@ -4,26 +4,100 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Read live ERC-20 contract state on Pharos through the official Chain MCP.">
-  <meta name="theme-color" content="#d1ccc0">
+  <meta name="theme-color" content="#0112b8">
   <title>Pharos Contract State Reader</title>
   <style>
-    :root{color-scheme:light;--bg:#d1ccc0;--surface:#f7f1e3;--ink:#252522;--muted:#67665f;--line:#bcb6a8;--accent:#6253a7;--accent-dark:#483b87;--ok:#356748;--error:#9a3832;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sans:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
-    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 var(--sans)}main{width:min(900px,100% - 32px);margin:0 auto;padding:56px 0 48px}.topline{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:14px;color:var(--muted);font:12px var(--mono);letter-spacing:.04em}.status{display:flex;align-items:center;gap:8px}.dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}h1{font-size:clamp(30px,5vw,48px);line-height:1.08;letter-spacing:-.04em;margin:38px 0 12px}.intro{color:var(--muted);max-width:670px;margin:0 0 28px}.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:24px;box-shadow:0 8px 28px #27251c0b}.fields{display:grid;grid-template-columns:1fr 1fr;gap:18px}.field{display:flex;flex-direction:column;gap:7px}.field label{font-size:13px;font-weight:650}.field small{font-size:12px;color:var(--muted)}input{width:100%;min-height:48px;border:1px solid #aaa495;border-radius:6px;padding:11px 12px;background:#fffdf8;color:var(--ink);font:13px var(--mono)}input:focus-visible,button:focus-visible{outline:3px solid #8c7ae6;outline-offset:2px}button{min-height:48px;margin-top:20px;padding:0 20px;border:0;border-radius:6px;background:var(--accent);color:white;font-weight:700;cursor:pointer;transition:background .18s ease,transform .18s ease}button:hover{background:var(--accent-dark)}button:active{transform:translateY(1px)}button:disabled{opacity:.62;cursor:wait}.hint{margin:14px 0 0;color:var(--muted);font-size:12px}.notice{margin:18px 0 0;padding:12px 14px;border-left:3px solid var(--accent);background:#eeeadf;font-size:13px}.notice strong{font-family:var(--mono);font-size:12px}.result{margin-top:24px}.result[hidden],.message[hidden]{display:none}.message{padding:14px 16px;border-radius:6px;background:#f4e4e0;color:var(--error);border:1px solid #d9aaa4;white-space:pre-wrap;overflow-wrap:anywhere}.result-head{display:flex;justify-content:space-between;gap:16px;align-items:baseline;margin-bottom:12px}.result-head h2{margin:0;font-size:20px}.block{font:12px var(--mono);color:var(--muted)}.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}table{width:100%;border-collapse:collapse;min-width:580px}th,td{text-align:left;padding:13px 15px;border-bottom:1px solid #ded8cb;vertical-align:top}th{font:11px var(--mono);text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}td:first-child{font-family:var(--mono);font-size:13px}td.value{font-weight:650;overflow-wrap:anywhere}td.raw{font:11px var(--mono);color:var(--muted);overflow-wrap:anywhere;max-width:260px}.meta{display:grid;grid-template-columns:130px 1fr;gap:7px 12px;margin:14px 0 0;font-size:13px}.meta dt{color:var(--muted)}.meta dd{margin:0;font-family:var(--mono);font-size:12px;overflow-wrap:anywhere}.proof{display:inline-flex;align-items:center;gap:7px;margin-top:16px;color:var(--ok);font:12px var(--mono)}footer{margin-top:30px;border-top:1px solid var(--line);padding-top:14px;color:var(--muted);font:11px var(--mono);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}a{color:var(--accent-dark)}@media(max-width:640px){main{padding-top:28px}.fields{grid-template-columns:1fr}.panel{padding:18px}.result-head{align-items:flex-start;flex-direction:column;gap:4px}.meta{grid-template-columns:100px 1fr}button{width:100%}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
+    :root {
+      color-scheme: light;
+      --blue: #0112b8;
+      --blue-dark: #000d86;
+      --navy: #101b45;
+      --ink: #171b2d;
+      --muted: #66708c;
+      --line: #dfe4f0;
+      --wash: #f3f6ff;
+      --surface: #ffffff;
+      --ok: #16734a;
+      --error: #a0343a;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--surface); color: var(--ink); font: 16px/1.55 var(--sans); }
+    body::before { content: ""; display: block; height: 4px; background: var(--blue); }
+    main { width: min(1040px, 100% - 40px); margin: 0 auto; padding: 28px 0 48px; }
+    .topline { display: flex; justify-content: space-between; align-items: center; gap: 20px; border-bottom: 1px solid var(--line); padding-bottom: 18px; color: var(--muted); font: 11px var(--mono); letter-spacing: .08em; }
+    .brand { display: inline-flex; align-items: center; gap: 12px; color: var(--navy); font-weight: 700; }
+    .mark { position: relative; width: 24px; height: 24px; display: inline-block; }
+    .mark i { position: absolute; left: 0; width: 19px; height: 5px; background: var(--blue); transform: skewY(-27deg); }
+    .mark i:nth-child(1) { top: 3px; }
+    .mark i:nth-child(2) { top: 10px; left: 5px; }
+    .mark i:nth-child(3) { top: 17px; left: 1px; }
+    .status { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+    .hero { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 56px; align-items: end; padding: 76px 0 48px; }
+    .eyebrow { margin: 0 0 17px; color: var(--blue); font: 700 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+    h1 { max-width: 650px; margin: 0; color: var(--navy); font-size: clamp(38px, 6vw, 68px); line-height: .98; letter-spacing: -.065em; }
+    .intro { max-width: 620px; margin: 22px 0 0; color: var(--muted); font-size: 17px; }
+    .hero-note { border-left: 2px solid var(--blue); padding: 4px 0 4px 16px; color: var(--muted); font: 12px/1.65 var(--mono); }
+    .hero-note strong { display: block; margin-bottom: 6px; color: var(--navy); font-size: 11px; letter-spacing: .08em; }
+    .panel { border: 1px solid var(--line); background: var(--surface); padding: 28px; box-shadow: 0 14px 40px rgba(13, 31, 100, .06); }
+    .panel-head { display: flex; justify-content: space-between; gap: 20px; align-items: baseline; margin-bottom: 22px; }
+    .panel-head h2 { margin: 0; color: var(--navy); font-size: 18px; letter-spacing: -.02em; }
+    .panel-head span { color: var(--muted); font: 11px var(--mono); }
+    .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .field { display: flex; flex-direction: column; gap: 7px; }
+    .field label { color: var(--navy); font-size: 13px; font-weight: 700; }
+    .field small { min-height: 19px; color: var(--muted); font-size: 12px; }
+    input { width: 100%; min-height: 50px; border: 1px solid #c7cfdf; border-radius: 2px; padding: 12px 13px; background: #fbfcff; color: var(--ink); font: 13px var(--mono); transition: border-color .18s ease, box-shadow .18s ease; }
+    input:hover { border-color: #8e9bc0; }
+    input:focus-visible, button:focus-visible { outline: 3px solid #8da2ff; outline-offset: 3px; }
+    input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(1, 18, 184, .10); }
+    button { min-height: 50px; margin-top: 22px; padding: 0 22px; border: 0; border-radius: 2px; background: var(--blue); color: #fff; font-weight: 750; cursor: pointer; transition: background .18s ease, transform .18s ease; }
+    button:hover { background: var(--blue-dark); }
+    button:active { transform: translateY(1px); }
+    button:disabled { opacity: .62; cursor: wait; }
+    .hint { margin: 13px 0 0; color: var(--muted); font-size: 12px; }
+    .notice { display: flex; gap: 12px; align-items: flex-start; margin: 22px 0 0; padding: 14px 16px; border: 1px solid #d8e0ff; background: var(--wash); color: var(--navy); font-size: 13px; }
+    .notice strong { flex: 0 0 auto; color: var(--blue); font: 700 10px var(--mono); letter-spacing: .08em; }
+    .result { margin-top: 48px; }
+    .result[hidden], .message[hidden] { display: none; }
+    .message { padding: 14px 16px; border: 1px solid #e5b8bc; background: #fff5f5; color: var(--error); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .result-head { display: flex; justify-content: space-between; gap: 18px; align-items: baseline; margin-bottom: 14px; }
+    .result-head h2 { margin: 0; color: var(--navy); font-size: 24px; letter-spacing: -.04em; }
+    .block { color: var(--blue); font: 700 11px var(--mono); letter-spacing: .05em; }
+    .table-wrap { overflow-x: auto; border-top: 2px solid var(--navy); border-bottom: 1px solid var(--line); }
+    table { width: 100%; border-collapse: collapse; min-width: 620px; }
+    th, td { text-align: left; padding: 14px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font: 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    td:first-child { width: 20%; color: var(--navy); font: 13px var(--mono); }
+    td.value { width: 32%; color: var(--navy); font-weight: 700; overflow-wrap: anywhere; }
+    td.raw { color: var(--muted); font: 11px var(--mono); overflow-wrap: anywhere; }
+    .meta { display: grid; grid-template-columns: 130px 1fr; gap: 8px 14px; margin: 22px 0 0; padding: 18px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+    .meta dt { color: var(--muted); }
+    .meta dd { margin: 0; color: var(--navy); font: 12px var(--mono); overflow-wrap: anywhere; }
+    .proof { display: inline-flex; align-items: center; gap: 8px; margin-top: 16px; color: var(--ok); font: 11px var(--mono); letter-spacing: .05em; }
+    footer { display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 52px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font: 11px var(--mono); }
+    @media (max-width: 720px) { main { width: min(100% - 28px, 620px); padding-top: 20px; } .topline { align-items: flex-start; flex-direction: column; gap: 10px; } .hero { display: block; padding: 54px 0 34px; } .hero-note { margin-top: 28px; } .fields { grid-template-columns: 1fr; gap: 18px; } .panel { padding: 20px; } button { width: 100%; } .result { margin-top: 36px; } .result-head { align-items: flex-start; flex-direction: column; gap: 6px; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
   </style>
 </head>
 <body>
 <main>
-  <div class="topline"><span>PHAROS / CONTRACT STATE</span><span class="status"><i class="dot" aria-hidden="true"></i> READ-ONLY · MAINNET</span></div>
-  <h1>Read contract state.</h1>
-  <p class="intro">Query a deployed ERC-20 on Pharos through the official Chain MCP. Reads are pinned to one block and formatted with token decimals.</p>
+  <div class="topline"><span class="brand"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>PHAROS / CONTRACT STATE</span><span class="status"><i class="dot" aria-hidden="true"></i> READ-ONLY · MAINNET</span></div>
+  <section class="hero">
+    <div><p class="eyebrow">chain mcp reader</p><h1>Read contract state.</h1><p class="intro">Query a deployed ERC-20 on Pharos through the official Chain MCP. Each result records one block, decoded values, and the raw ABI response.</p></div>
+    <div class="hero-note"><strong>NO WRITE ACCESS</strong>Public addresses only.<br>No wallet connection.<br>No transaction signature.</div>
+  </section>
   <form class="panel" id="reader-form">
+    <div class="panel-head"><h2>Contract input</h2><span>PHAROS · CHAIN 1672</span></div>
     <div class="fields">
-      <div class="field"><label for="contract">Contract address <span aria-hidden="true">*</span></label><input id="contract" name="contractAddress" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="0x…" required pattern="0x[a-fA-F0-9]{40}" aria-describedby="contract-help"><small id="contract-help">Pharos Mainnet ERC-20 contract.</small></div>
-      <div class="field"><label for="wallet">Wallet address <span style="font-weight:400;color:var(--muted)">(optional)</span></label><input id="wallet" name="walletAddress" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="0x…" pattern="0x[a-fA-F0-9]{40}" aria-describedby="wallet-help"><small id="wallet-help">If supplied, reads `balanceOf(address)`.</small></div>
+      <div class="field"><label for="contract">Contract address <span aria-hidden="true">*</span></label><input id="contract" name="contractAddress" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="0x…" required pattern="0x[a-fA-F0-9]{40}" aria-describedby="contract-help"><small id="contract-help">Deployed ERC-20 contract on Pharos Mainnet.</small></div>
+      <div class="field"><label for="wallet">Wallet address <span style="font-weight:400;color:var(--muted)">(optional)</span></label><input id="wallet" name="walletAddress" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="0x…" pattern="0x[a-fA-F0-9]{40}" aria-describedby="wallet-help"><small id="wallet-help">Adds `balanceOf(address)` to the read set.</small></div>
     </div>
     <button id="read-button" type="submit">Read contract</button>
-    <p class="hint">No wallet connection, private key, or transaction required.</p>
-    <div class="notice"><strong>DATA SOURCE</strong><br>Official Pharos Chain MCP · `eth_call` · no direct RPC fallback.</div>
+    <p class="hint">Reads use `eth_call`; they do not create a transaction hash.</p>
+    <div class="notice"><strong>DATA SOURCE</strong><span>Official Pharos Chain MCP · pinned block · no direct RPC fallback.</span></div>
   </form>
   <section class="result" id="result" aria-live="polite" hidden>
     <div id="error" class="message" role="alert" hidden></div>
@@ -37,35 +111,41 @@
   <footer><span>PHAROS CHAIN MCP READER</span><span>State may change after the reported block.</span></footer>
 </main>
 <script type="module">
-  const form=document.querySelector('#reader-form');
-  const button=document.querySelector('#read-button');
-  const result=document.querySelector('#result');
-  const errorBox=document.querySelector('#error');
-  const reportBox=document.querySelector('#report');
-  function text(node,value){node.textContent=value??'—';}
-  function addRow(label,value,raw){const tr=document.createElement('tr');for(const [content,cls]of [[label,''],[value,'value'],[raw??'not requested','raw']]){const td=document.createElement('td');td.className=cls;td.textContent=content;tr.append(td);}document.querySelector('#state-rows').append(tr);}
-  form.addEventListener('submit',async(event)=>{
-    event.preventDefault();if(!form.reportValidity())return;
-    const contractAddress=document.querySelector('#contract').value.trim();
-    const walletAddress=document.querySelector('#wallet').value.trim();
-    result.hidden=false;errorBox.hidden=true;reportBox.hidden=true;button.disabled=true;button.textContent='Reading…';
-    try{
-      const response=await fetch('/api/read-contract',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({contractAddress,walletAddress})});
-      const data=await response.json();if(!response.ok)throw new Error(data.error||`Request failed (${response.status})`);
-      text(document.querySelector('#token-title'),`${data.state.name.value} (${data.state.symbol.value})`);
-      text(document.querySelector('#block-number'),`BLOCK ${data.block.number}`);
-      text(document.querySelector('#network'),`${data.network.name} · chain ${data.network.chainId}`);
-      text(document.querySelector('#contract-out'),data.target.contractAddress);
-      text(document.querySelector('#wallet-out'),data.target.walletAddress||'Not queried');
-      const rows=document.querySelector('#state-rows');rows.replaceChildren();
-      for(const key of ['name','symbol','decimals','totalSupply','balanceOf']){
-        const item=data.state[key];if(!item)continue;
-        const value=key==='totalSupply'||key==='balanceOf'?`${item.value} ${item.unit}`:String(item.value);
-        addRow(key==='balanceOf'?'balanceOf(wallet)':`${key}()`,value,item.raw);
+  const form = document.querySelector('#reader-form');
+  const button = document.querySelector('#read-button');
+  const result = document.querySelector('#result');
+  const errorBox = document.querySelector('#error');
+  const reportBox = document.querySelector('#report');
+  function text(node, value) { node.textContent = value ?? '—'; }
+  function addRow(label, value, raw) {
+    const tr = document.createElement('tr');
+    for (const [content, cls] of [[label, ''], [value, 'value'], [raw ?? 'not requested', 'raw']]) {
+      const td = document.createElement('td'); td.className = cls; td.textContent = content; tr.append(td);
+    }
+    document.querySelector('#state-rows').append(tr);
+  }
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault(); if (!form.reportValidity()) return;
+    const contractAddress = document.querySelector('#contract').value.trim();
+    const walletAddress = document.querySelector('#wallet').value.trim();
+    result.hidden = false; errorBox.hidden = true; reportBox.hidden = true; button.disabled = true; button.textContent = 'Reading…';
+    try {
+      const response = await fetch('/api/read-contract', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ contractAddress, walletAddress }) });
+      const data = await response.json(); if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
+      text(document.querySelector('#token-title'), `${data.state.name.value} (${data.state.symbol.value})`);
+      text(document.querySelector('#block-number'), `BLOCK ${data.block.number}`);
+      text(document.querySelector('#network'), `${data.network.name} · chain ${data.network.chainId}`);
+      text(document.querySelector('#contract-out'), data.target.contractAddress);
+      text(document.querySelector('#wallet-out'), data.target.walletAddress || 'Not queried');
+      const rows = document.querySelector('#state-rows'); rows.replaceChildren();
+      for (const key of ['name', 'symbol', 'decimals', 'totalSupply', 'balanceOf']) {
+        const item = data.state[key]; if (!item) continue;
+        const value = key === 'totalSupply' || key === 'balanceOf' ? `${item.value} ${item.unit}` : String(item.value);
+        addRow(key === 'balanceOf' ? 'balanceOf(wallet)' : `${key}()`, value, item.raw);
       }
-      reportBox.hidden=false;
-    }catch(error){errorBox.textContent=error.message||'Contract read failed.';errorBox.hidden=false;}
-    finally{button.disabled=false;button.textContent='Read contract';}
+      reportBox.hidden = false;
+    } catch (error) { errorBox.textContent = error.message || 'Contract read failed.'; errorBox.hidden = false; }
+    finally { button.disabled = false; button.textContent = 'Read contract'; }
   });
 </script>
 </body>
